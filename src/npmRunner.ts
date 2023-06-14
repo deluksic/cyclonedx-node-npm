@@ -23,6 +23,7 @@ import { resolve } from 'path'
 
 /** !attention: args might not be shell-save. */
 export type runFunc = (args: string[], options: ExecSyncOptionsWithBufferEncoding) => Buffer
+export type PackageManager = 'npm' | 'pnpm'
 
 /**
  * Matches the filename for the npx cli script in a given path:
@@ -69,12 +70,12 @@ function getExecPath (process_: NodeJS.Process, console_: Console): string | und
   throw new Error(`unexpected NPM execPath: ${execPath}`)
 }
 
-export function makeNpmRunner (process_: NodeJS.Process, console_: Console): runFunc {
+export function makeNpmRunner (process_: NodeJS.Process, console_: Console, packageManager: PackageManager): runFunc {
   const execPath = getExecPath(process_, console_)
   if (execPath === undefined) {
     console_.debug('DEBUG | makeNpmRunner caused execSync "npm"')
     // not shell-save - but this is okay four our use case - since we have complete control over `args` in the caller.
-    return (args, options) => execSync('npm ' + args.join(' '), options)
+    return (args, options) => execSync(packageManager + ' ' + args.join(' '), options)
   }
 
   if (jsMatcher.test(execPath)) {

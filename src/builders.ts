@@ -23,13 +23,14 @@ import * as normalizePackageData from 'normalize-package-data'
 import { type PackageURL } from 'packageurl-js'
 import * as path from 'path'
 
-import { makeNpmRunner, type runFunc } from './npmRunner'
+import { makeNpmRunner, type PackageManager, type runFunc } from './npmRunner'
 import { PropertyNames, PropertyValueBool } from './properties'
 import { versionCompare } from './versionCompare'
 
 type OmittableDependencyTypes = 'dev' | 'optional' | 'peer'
 
 interface BomBuilderOptions {
+  packageManager?: BomBuilder['packageManager']
   ignoreNpmErrors?: BomBuilder['ignoreNpmErrors']
   metaComponentType?: BomBuilder['metaComponentType']
   packageLockOnly?: BomBuilder['packageLockOnly']
@@ -48,6 +49,7 @@ export class BomBuilder {
   treeBuilder: TreeBuilder
   purlFactory: Factories.FromNodePackageJson.PackageUrlFactory
 
+  packageManager: PackageManager
   ignoreNpmErrors: boolean
 
   metaComponentType: Enums.ComponentType
@@ -79,6 +81,7 @@ export class BomBuilder {
     this.reproducible = options.reproducible ?? false
     this.flattenComponents = options.flattenComponents ?? false
     this.shortPURLs = options.shortPURLs ?? false
+    this.packageManager = options.packageManager ?? 'npm'
 
     this.console = console_
   }
@@ -91,7 +94,7 @@ export class BomBuilder {
 
   private getNpmVersion (npmRunner: runFunc, process_: NodeJS.Process): number[] {
     let npmVersion: number[]
-    this.console.info('INFO  | detect NPM version ...')
+    this.console.info(`INFO  | detect ${this.packageManager} version ...`)
     try {
       npmVersion = npmRunner(['--version'], {
         env: process_.env,
@@ -110,12 +113,12 @@ export class BomBuilder {
       this.console.groupEnd()
       throw runError
     }
-    this.console.debug('DEBUG | detected NPM version %j', npmVersion)
+    this.console.debug(`DEBUG | detected ${this.packageManager} version %j`, npmVersion)
     return npmVersion
   }
 
   private fetchNpmLs (projectDir: string, process_: NodeJS.Process): any {
-    const npmRunner = makeNpmRunner(process_, this.console)
+    const npmRunner = makeNpmRunner(process_, this.console, this.packageManager)
 
     const npmVersion = this.getNpmVersion(npmRunner, process_)
 
@@ -126,9 +129,11 @@ export class BomBuilder {
       // get all the needed content
       '--long',
       // depth = infinity
-      npmVersion[0] >= 7
-        ? '--all'
-        : '--depth=255'
+      this.packageManager == 'pnpm'
+        ? '--depth=Infinity'
+        : npmVersion[0] >= 7
+          ? '--all'
+          : '--depth=255'
     ]
 
     if (this.packageLockOnly) {
@@ -203,6 +208,13 @@ export class BomBuilder {
     this.console.info('INFO  | build BOM ...')
 
     // region all components & dependencies
+
+    if (this.packageManager == 'pnpm') {
+      if (!Array.isArray(data) || data.length !== 1) {
+        throw new Error(`Expected an array of length exactly one, got ${JSON.stringify(data)}. This could happen because pnpm returned multiple projects. Please use pnpm --filter option.`)
+      }
+      data = data[0]
+    }
 
     /* eslint-disable-next-line @typescript-eslint/strict-boolean-expressions, @typescript-eslint/prefer-nullish-coalescing --
      * as we need to enforce a proper root component to enable all features of SBOM */

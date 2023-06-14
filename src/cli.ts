@@ -35,6 +35,11 @@ enum Omittable {
   Peer = 'peer',
 }
 
+enum PackageManager {
+  NPM = 'npm',
+  PNPM = 'pnpm',
+}
+
 const OutputStdOut = '-'
 
 interface CommandOptions {
@@ -49,6 +54,7 @@ interface CommandOptions {
   outputFile: string
   validate: boolean
   mcType: Enums.ComponentType
+  packageManager: PackageManager
 }
 
 function makeCommand (process: NodeJS.Process): Command {
@@ -171,6 +177,16 @@ function makeCommand (process: NodeJS.Process): Command {
       'package.json',
       '"package.json" file in current working directory'
     )
+  ).addOption(
+    new Option(
+      '--package-manager <type...>',
+      'Which package manager to use, npm or pnpm.'
+    ).choices(
+      Object.values(PackageManager)
+    ).default(
+      PackageManager.NPM,
+      `"${PackageManager.NPM}"`
+    )
   ).version(
     // that is supposed to be the last option in the list on the help page.
     /* eslint-disable-next-line @typescript-eslint/no-var-requires */
@@ -239,7 +255,8 @@ export async function run (process: NodeJS.Process): Promise<number> {
       omitDependencyTypes: options.omit,
       reproducible: options.outputReproducible,
       flattenComponents: options.flattenComponents,
-      shortPURLs: options.shortPURLs
+      shortPURLs: options.shortPURLs,
+      packageManager: options.packageManager
     },
     myConsole
   ).buildFromProjectDir(projectDir, process)
